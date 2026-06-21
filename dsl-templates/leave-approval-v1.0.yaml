@@ -1,0 +1,192 @@
+# ============================================================
+# Co-Agent Core DSL 原型 v1.0
+# 场景名称：员工请假审批
+# 版权：© 2026 江门市戴梦达管理咨询有限公司
+# 许可：AGPLv3
+# ============================================================
+
+scenario: 员工请假审批
+domain: HR & 组织行为
+version: "1.0"
+co_agent_core_version: "1.0"
+
+# 1. 核心理念声明 (注入AI仲裁层)
+philosophy:
+  trust_level: 高信任，低管控
+  core_principle: "信任前端，审计后端，例外驱动优化"
+  exception_handling: 将拒绝转化为对话
+  evolution_focus: 事假模式预警与组织健康度监测
+  human_value_elevation: "员工从‘被审批者’变为‘自我管理者’；Leader从‘签字机器’变为‘团队健康诊断者’"
+
+# 2. 协同角色定义
+roles:
+  - id: applicant
+    name: 申请人
+    type: human
+    capabilities: [发起申请, 补充说明, 申请复核, 查看AI决策依据]
+
+  - id: ai_manager
+    name: AI值班经理
+    type: ai
+    traits: [通情达理, 严守底线, 7x24小时在线, 主动示弱]
+    responsibility: 初审与常规事务处理
+    boundary: "不处理涉及员工隐私争议、不单独决定涉及法律风险的复杂案例"
+
+  - id: team_leader
+    name: 团队Leader
+    type: human
+    capabilities: [审批, 驳回, 发起关怀对话, 调整自动化策略]
+    intervention_rules: "仅当AI无法确定或申请人申诉时介入"
+
+# 3. 协同信任梯度设计
+trust_gradient:
+  - zone: 高信任区
+    condition: "合规性=合规 AND 团队影响=低 AND 无异常模式"
+    ai_authority: 自动批准
+    human_involvement: 仅通知
+  - zone: 中信任区
+    condition: "合规但存疑 OR 团队影响=中"
+    ai_authority: 生成建议，推送给Leader
+    human_involvement: 一键确认或修改
+  - zone: 低信任区
+    condition: "不合规 OR 有严重合规冲突"
+    ai_authority: 发起解释型对话，不直接拒绝
+    human_involvement: 必要时升级Leader
+
+# 4. 核心协同工作流 (状态机设计)
+workflow:
+  trigger: 申请人发起请假申请
+
+  steps:
+    - id: step1_ai_triage
+      actor: ai_manager
+      name: AI初审
+      logic: |
+        根据以下原则并行判断：
+        1. 规则校验：请假时长、类型是否符合国家和公司规定。
+        2. 影响评估：查询团队日历，评估该时段人手状况。
+        3. 上下文理解：检索申请人过往请假记录，判断是否为异常连续请假。
+        4. 模式识别：是否存在需要管理者关注的请假模式（如连续周五下午请假）。
+      output:
+        name: 初审报告
+        fields:
+          - 合规性: [合规, 合规但存疑, 不合规]
+          - 团队影响等级: [低, 中, 高]
+          - 需人工关注点: [无, 有]
+          - 关注原因: "如有关注点，用自然语言说明"
+          - AI置信度: 0-100
+      explainability: "初审报告的每一项判断，都必须附带可解释的原因说明"
+
+    - id: step2_decision_tree
+      actor: system
+      name: 智能路由
+      trigger: 收到AI初审报告
+      routes:
+        - condition: "合规性=合规 AND 团队影响=低 AND 无关注点 AND AI置信度>90"
+          action: 自动批准
+          notification: "向申请人展示审批结果、规则依据、团队影响评估"
+        - condition: "不合规 OR 有严重合规冲突"
+          action: 启动解释型对话
+          dialogue_flow: |
+            1. 清晰说明当前申请与哪条规则冲突
+            2. 提供可选的合规替代方案（如“该时段不可用，建议选择次日上午”）
+            3. 询问是否需要补充特殊说明
+            4. 如申请人坚持，标记为“需人工复核”并升级
+        - condition: "合规但存疑 OR 团队影响≥中 OR 有关注点 OR AI置信度<90"
+          action: 升级Leader
+          escalation_package:
+            - AI初审报告
+            - 员工提交的请假原因
+            - 团队当日出勤概览
+            - AI高亮标记的关注点
+
+    - id: step3_human_intervention
+      actor: team_leader
+      name: Leader决策
+      trigger: 接收到AI的升级请求
+      interface:
+        dashboard_title: "你的团队需要你的一次关注"
+        core_content:
+          - AI高亮标记的关注点
+          - 员工提交的原因
+          - 团队当日出勤概览
+          - AI建议的处理方向（仅供参考）
+        actions:
+          - 同意: "确认批准，并可附加一段私密备注给员工"
+          - 驳回并说明: "附上私密原因，AI将学习此判断模式"
+          - 转为当面沟通: "暂不处理，标记为线下沟通"
+        intervention_level:
+          - 一键同意: "信任AI建议，快速批准"
+          - 深度审查: "查看完整上下文后决定"
+      evolution_hook: |
+        此次干预的全部决策数据被记录至事件溯源存储。
+        如果同一员工一个月内被驳回≥3次，系统自动提醒Leader：是否需要进行一次主动关怀？
+
+    - id: step4_appeal
+      actor: applicant
+      name: 申请复核
+      trigger: 对自动审批结果有异议
+      flow: |
+        1. 员工点击“申请人工复核”
+        2. 系统展示AI决策的完整依据
+        3. 员工补充说明或上传证明材料
+        4. 升级至Leader处理
+      evolution_hook: "复核申请被记录，用于评估AI决策的准确性和公平性"
+
+    - id: step5_learning_loop
+      actor: ai_manager
+      name: 组织学习
+      trigger: 每月1号
+      actions:
+        - name: 生成请假模式组织健康度月报
+          contents:
+            - 高频请假时段预警
+            - 异常请假模式提醒（如某部门周五下午请假率异常高）
+            - 人工干预率趋势分析
+            - 规则优化建议（如“连续被驳回3次的规则，是否需要修订？”）
+        - name: 自我进化建议
+          contents:
+            - 基于Leader干预数据，提出信任梯度调整建议
+            - 基于申诉数据，提出AI决策逻辑优化建议
+
+# 5. 人机协同接口要求
+generated_software_requirements:
+  explainability:
+    - 任何自动批准/拒绝，都必须有清晰的“为什么”
+    - 对于“升级Leader”，必须向员工透明告知具体原因
+    - AI的决策依据应以自然语言呈现，避免纯代码或规则ID
+  intervenability:
+    - Leader在任何时候，可一键将流程从“AI全自动”降级为“人工全审批”
+    - 员工对于自动审批结果，拥有一次“申请人工复核”的权利
+    - 所有干预入口必须在界面中显著可见，不得隐藏在三级菜单后
+  trust_building:
+    - AI首次服务时主动声明能力边界
+    - AI在置信度<90%时，主动告知用户“我不太确定，建议人工确认”
+    - 系统定期向员工展示“AI本月帮你处理了X次请假，你手动介入过Y次”
+
+# 6. BI与分析需求
+analytics:
+  dashboard:
+    - name: 团队请假热力图
+      purpose: 帮助管理者一眼看出哪个时段最缺人
+    - name: AI处理效率与人工干预率趋势图
+      purpose: 监控人机协同健康度
+    - name: 个人请假模式摘要
+      purpose: 对员工本人透明可见，作为自我管理的参考
+  alerts:
+    - type: 团队健康预警
+      condition: "同一小组下月人均事假超过2天"
+      action: "提醒管理者关注，而非立即限制"
+    - type: 自动化质量预警
+      condition: "人工干预率连续2周上升超过10%"
+      action: "自动触发AI决策逻辑审查"
+  evolution_signals:
+    - "连续3个月某类特殊情况成为审批瓶颈时，自动生成《规则修订建议草案》"
+    - "某类请假的人工复核申请持续增加时，提示需重新审视该规则的人性化程度"
+
+# 7. 安全与合规
+security:
+  data_minimization: "仅采集审批必需的员工信息"
+  access_control: "Leader只能看到本团队的请假数据"
+  audit_trail: "所有决策过程完整记录，不可篡改"
+  bias_detection: "每月自动检测AI决策在不同性别、年龄、资历群体中的统计偏差"
